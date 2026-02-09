@@ -4,7 +4,7 @@ import json
 import asyncio
 import random
 from playwright.async_api import async_playwright
-from utils import URL_SEARCH, get_params, getHeaders, DEST, getUrlCard
+from utils import URL_SEARCH, get_params, getHeaders, DEST, getUrlCard, getUrlImg
 import aiohttp
 from aiohttp_proxy import ProxyConnector, ProxyType
 from dataclasses import dataclass
@@ -25,6 +25,9 @@ class DataClass:
     sizes: str = None
     rating: str = None
     feedBack: str = None
+    opts: str = None
+    sizesName: str = None
+
 
 
 
@@ -40,7 +43,7 @@ async def getCard(
         job,
 ):
     print(f'Create task {task} {proxy}')
-
+    allCards = []
     username = proxy.split('@')[0].split(':')[0]
     password = proxy.split('@')[0].split(':')[1]
     host = proxy.split('@')[1].split(':')[0]
@@ -59,36 +62,68 @@ async def getCard(
         async with aiohttp.ClientSession(connector=connector) as session:
             while True:
                 detail = await queue.get()
+                #print(f'get detaul len {len(detail)}')
+                await  asyncio.sleep(0.5)
                 if detail == None:
                     break
                 ids =str(  detail['id'] )
 
                 print(f'Карточка {ids}')
                 try:
-                    async with session.get(url=getUrlCard(ids),
+                    url = getUrlCard(ids)
+                    async with session.get(url=url,
                                             headers=getHeaders(cookie=cookie)
                     ) as res:
+
+                        if res.status == 404:
+                            print(f'404: {url}')
+                            #нет такой страницы
+                            ###Сделать ввывод ошибок
+                            continue
+
                         responseText = await res.text()
-                        resoinseCard = json.loads(responseText)
-
-                        # Успешно получили card )
-                        #detail
-                        #resoinseCard
-                        cardFinal = {
+                        responseCard = json.loads(responseText)
 
 
-                        }
+                        info = DataClass()
+                        info.description =  responseCard['description']
+                        info.imgs = getUrlImg(id = str(ids), count = int(responseCard['media']['photo_count']))
+                        info.urlCard = f'https://www.wildberries.ru/catalog/{ids}/detail.aspx'
+                        info.article = ids
+                        info.name = responseCard['imt_name']
+                        info.price = 'None'
+                        info.supplierName = detail['supplier']
+                        info.url_supplier = f'https://www.wildberries.ru/seller/{detail['supplierId']}'
+
+                        qty = 0
+                        # все размеры по name
+                        sizes = []
+                        # размеры, через запятую
+                        sizesName = ''
+
+                        for q in detail['sizes']:
+                            sizes.append(q['name'])
+                            if 'stocks' in q:
+                                if q['stocks'] != []:
+                                    if 'qty' in q['stocks'][0]:
+                                        qty = qty + int(q['stocks'][0]['qty'])
+                        sizesName = ','.join(sizes)
+                       # info.qtySize = ''
+                        info.qty = str(qty)
+                        info.sizesName = sizesName
+                        info.rating = str(detail['reviewRating'])
+                        info.feedBack = str(detail['feedbacks'])
+
+                        opts = []
+                        for opt in responseCard['options']:
+                            opts.append(f'{opt['name']} : {opt['value']} ')
+
+                        info.opts = opts
+                        allCards.append(info)
 
 
-                    """
-                    responseCard = requests.get(
-                        getUrlCard(id),
-                        headers=headers,
-                    ).json()
-                    """
                     pass
                 except Exception as err:
-                    raise
                     print(f'Ошибка')
 
             """
@@ -100,7 +135,8 @@ async def getCard(
         #return result
     except:
         raise
-    return {"card" : []}
+    return {"card" : [allCards]}
+    #return allCards
 
 
 async def main(queue: asyncio.Queue, query:str):
@@ -167,17 +203,17 @@ async def main(queue: asyncio.Queue, query:str):
 
                         responseText = await res.text()
                         response = json.loads(responseText)
-                        print(response)
+                        #print(response)
 
                         for q in response['products']:
                             await queue.put(q)
-
-                        print(response)
-
-
+                        #print(response)
                         print('--DETAIL---')
 
                     ###!!!Внимание break
+
+                    #if count>300:
+                    #    break
                     break
                 except Exception as err:
                     print('ошибка выполнения запроса')
@@ -192,30 +228,23 @@ async def main(queue: asyncio.Queue, query:str):
             count = count + 100
                 # Получаем максимальное кол-во карточек
 
-            """
-            ###Получаем detail по 100 id(артикулам) карточек
 
-            resDetail = requests.get(
-                url=f'https://www.wildberries.ru/__internal/u-card/cards/v4/detail?appType=1&curr=rub&dest={DEST}&spp=30&hide_vflags=4294967296&hide_dtype=9&ab_testing=false&lang=ru&nm={response['products'][0]['id']}',
-                headers=headers,
-            ).json()
-            print('DETAIL')
-
-            for detail in resDetail['products']:
-                parse_card(detail)
-
-            print(resDetail)
-            print('---DETAIL---')
-            print(f"Запрос {page} из {maxCount // 100 + 1}: Карточек: {len(nms)}")
-            """
 
     job = False
-    await queue.put(None)
+    for i in range(0, len(listProxyCookie)+1):
+        await queue.put(None)
     print('job = False')
     results = await asyncio.gather(*tasks_list)
 
-    print(results)
-    await asyncio.sleep(5000000)
+    pass
+
+    ###Save openXlsx
+
+
+
+    ###---Save openXlsx
+
+
 
 
 
