@@ -21,13 +21,16 @@ getListCookie = []
 listProxyCookie = []
 checkProxyCookie = []
 
-def getNewCookie(proxy:str):
+def getNewCookie(proxy:str, check:bool):
     try:
-        username = proxy.split('@')[0].split(':')[0]
-        password = proxy.split('@')[0].split(':')[1]
-        host = proxy.split('@')[1].split(':')[0]
-        port = int(proxy.split('@')[1].split(':')[1])
-        proxyP = {"server": f"http://{host}:{str(port)}", "username": username, "password": password}
+        if check:
+            username = proxy.split('@')[0].split(':')[0]
+            password = proxy.split('@')[0].split(':')[1]
+            host = proxy.split('@')[1].split(':')[0]
+            port = int(proxy.split('@')[1].split(':')[1])
+            proxyP = {"server": f"http://{host}:{str(port)}", "username": username, "password": password}
+        else:
+            proxyP = None
         with sync_playwright() as p:
             browser =  p.chromium.launch(
                 headless=False,
@@ -132,9 +135,9 @@ for i, cookie in enumerate(checkProxyCookie):
 
         print(f'Ошибка получения запроса прокси {proxy}', err)
 
-
-#Если у нас ещё небыло записи cookie для Proxy или же cookie устарели
-for i, proxy in enumerate(getListCookie):
-    getNewCookie(proxy)
+def startProxy():
+    #Если у нас ещё небыло записи cookie для Proxy или же cookie устарели
+    for i, proxy in enumerate(getListCookie):
+        getNewCookie(proxy, True)
 
 

@@ -84,7 +84,12 @@ def getBasket(id:str):
     vol = ''
     if len(id) == 8:
         vol = id[:3]
-    else: vol = id[:4]
+    elif len(id)==9:
+        vol = id[:4]
+    elif len(id)==7:
+        vol=id[:2]
+    else:
+        print('Другие сервера')
 
     #Тут жесткий костыль, когда я инициализированную переменную типа String, а после переназначаю в Int 😂
     vol = int(vol)
@@ -131,14 +136,15 @@ def getBasket(id:str):
 
 def getServer(id:str):
     vol = ''
-    if len(id) == 8: vol = id[:3]
-    else:
-        vol = id[:4]
-    part = ''
     if len(id) == 8:
+        vol = id[:3]
         part = id[:5]
-    else:
+    elif len(id) == 9:
+        vol=id[:4]
         part = id[:6]
+    elif len(id)==7:
+        part = id[:4]
+        vol = id[0:2]
     return f'https://basket-{getBasket(id)}.wbbasket.ru/vol{vol}/part{part}/{id}'
 
 def getUrlCard(id:str):
@@ -149,3 +155,4 @@ def getUrlImg(id:str, count:int):
     for i in range(1,count+1):
         urls.append(getServer(id) + f'/images/big/{i}.webp')
     return ', '.join(urls)
+

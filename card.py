@@ -1,4 +1,6 @@
 import time
+from decimal import Decimal
+
 from get_cookie import listProxyCookie
 import json
 import asyncio
@@ -8,10 +10,14 @@ from utils import URL_SEARCH, get_params, getHeaders, DEST, getUrlCard, getUrlIm
 import aiohttp
 from aiohttp_proxy import ProxyConnector, ProxyType
 
-from save_from_xlsx import save
+from save_from_xlsx import save, ids_save
 from utils import DataClass
+unicalDetail = []
+card_pars_id = []
 
+duble = {}
 
+max_card_count = 0
 async def getCard(
         proxy:str,
         task:str,
@@ -41,7 +47,8 @@ async def getCard(
         detail:dict
         async with aiohttp.ClientSession(connector=connector) as session:
             while True:
-                detail = await queue.get()
+                async with lock:
+                    detail = await queue.get()
                 #print(f'get detaul len {len(detail)}')
                 await  asyncio.sleep(0.5)
                 if detail == None:
@@ -49,67 +56,70 @@ async def getCard(
                 ids =str(  detail['id'] )
 
                 print(f'Карточка {ids}')
-                try:
-                    url = getUrlCard(ids)
-                    async with session.get(url=url,
-                                            headers=getHeaders(cookie=cookie)
-                    ) as res:
-                        if res.status == 404:
-                            print(f'404: {url}')
-                            #нет такой страницы
-                            ###Сделать ввывод ошибок
-                            continue
+                info = DataClass()
+                for i in range(0, 3):
+                    try:
+                        url = getUrlCard(ids)
 
-                        responseText = await res.text()
-                        responseCard = json.loads(responseText)
+                        async with session.get(url=url,
+                                                headers=getHeaders(cookie=cookie)
+                        ) as res:
+                            card_200 =False
+                            if res.status == 404:
+                                print(f'404: {url}')
+                                #нет такой страницы
+                                ###Сделать ввывод ошибок
 
+                            if res.status == 200:
+                                #Если у нас есть Карточка. Её может и не быть)
+                                cars_200 = True
+                                responseText = await res.text()
+                                responseCard = json.loads(responseText)
+                                if 'description' in responseCard:
+                                    info.description = responseCard['description']
+                                else:
+                                    info.description = ''
+                                if 'options' in responseCard:
+                                    opts = []
+                                    for opt in responseCard['options']:
+                                        opts.append(f'{opt['name']} : {opt['value']} ')
+                                    info.opts = opts
+                            info.imgs = str(getUrlImg(id = str(ids), count = int(detail["pics"])))
+                            info.urlCard = f'https://www.wildberries.ru/catalog/{ids}/detail.aspx'
+                            info.article = ids
+                            info.name = detail['name']
+                            try:
+                                for pr in detail['sizes']:
+                                    if 'price' in pr:
+                                        info.price = str(pr['price']['product'])[:-2]
+                            except:
+                                print(f'not price: {url}')
+                            info.supplierName = detail['supplier']
+                            info.url_supplier = f'https://www.wildberries.ru/seller/{detail['supplierId']}'
+                            qty = 0
+                            # все размеры по name
+                            sizes = []
+                            # размеры, через запятую
+                            sizesName = ''
 
-                        info = DataClass()
-                        info.description =  responseCard['description']
-                        info.imgs = str(getUrlImg(id = str(ids), count = int(responseCard['media']['photo_count'])))
-                        info.urlCard = f'https://www.wildberries.ru/catalog/{ids}/detail.aspx'
-                        info.article = ids
-                        info.name = responseCard['imt_name']
-                        try:
-                            for pr in detail['sizes']:
-                                if 'price' in pr:
-                                    info.price = str(pr['price']['product'])[:-2]
-                        except:
-                            print(f'not price: {url}')
-                        info.supplierName = detail['supplier']
-
-
-
-                        info.url_supplier = f'https://www.wildberries.ru/seller/{detail['supplierId']}'
-
-                        qty = 0
-                        # все размеры по name
-                        sizes = []
-                        # размеры, через запятую
-                        sizesName = ''
-
-                        for q in detail['sizes']:
-                            sizes.append(q['name'])
-                            if 'stocks' in q:
-                                if q['stocks'] != []:
-                                    if 'qty' in q['stocks'][0]:
-                                        qty = qty + int(q['stocks'][0]['qty'])
-                        sizesName = ','.join(sizes)
-                       # info.qtySize = ''
-                        info.qty = str(qty)
-                        info.sizesName = sizesName
-                        info.rating = str(detail['reviewRating'])
-                        info.feedBack = str(detail['feedbacks'])
-                        opts = []
-                        if 'options' in responseCard:
-                            for opt in responseCard['options']:
-                                opts.append(f'{opt['name']} : {opt['value']} ')
-                        info.opts = opts
-                        allCards.append(info)
-                    pass
-                except Exception as err:
-                    print(f'non data: {url}')
-                    print(f'Ошибка')
+                            for q in detail['sizes']:
+                                sizes.append(q['name'])
+                                if 'stocks' in q:
+                                    if q['stocks'] != []:
+                                        if 'qty' in q['stocks'][0]:
+                                            qty = qty + int(q['stocks'][0]['qty'])
+                            sizesName = ','.join(sizes)
+                           # info.qtySize = ''
+                            info.qty = str(qty)
+                            info.sizesName = sizesName
+                            info.rating = Decimal(detail['reviewRating'])
+                            info.feedBack = str(detail['feedbacks'])
+                            allCards.append(info)
+                        pass
+                    except Exception as err:
+                        await asyncio.sleep(5)
+                        print(f'non data: {url}')
+                        print(f'Ошибка запроса, попытка {i}')
 
             """
             async with aiohttp.ClientSession(connector=connector) as session:
@@ -118,8 +128,9 @@ async def getCard(
             """
 
         #return result
-    except:
-        raise
+    except Exception as err:
+        print('err', err)
+        #raise
     return {"card" : [allCards]}
     #return allCards
 
@@ -173,6 +184,7 @@ async def main(queue: asyncio.Queue, query:str):
 
                         if maxCount == 0:
                             maxCount = int(response['total'])
+                            max_card_count = maxCount
                             print(f'TOTAL PARS{maxCount}')
                             print(f"Карточек по запросу «{query}»: {maxCount}")
                         nm = ''
@@ -192,9 +204,14 @@ async def main(queue: asyncio.Queue, query:str):
                         responseText = await res.text()
                         response = json.loads(responseText)
                         #print(response)
-
+                        print(f'Получили карточек {len(response['products'])}')
                         for q in response['products']:
-                            await queue.put(q)
+                            if not str(q['id']) in card_pars_id:
+                                card_pars_id.append(str(q['id']))
+                                await queue.put(q)
+                            else:
+                                duble[str(q['id'])] = q
+                                print(f'Дубль {q['id']}')
                         #print(response)
                         print('--DETAIL---')
 
@@ -223,8 +240,21 @@ async def main(queue: asyncio.Queue, query:str):
     ###Save openXlsx
     save(results)
     ###---Save openXlsx
-
+    print(f'Дубли при SEARCH {len(duble)}')
+    print(f'Всего карточек {max_card_count}')
+    print(f'Карточек отправленых в pars {len(card_pars_id)}')
     print(f'Время сбора карточек из поиска: {(time.time() - startTime):.4f} секунд')
+
+    set1 = set(ids_save)
+    set2 = set(card_pars_id)
+
+    result1 = set1 - set2  # или set1.difference(set2)
+    # Находим элементы, которые есть только во втором массиве (но нет в первом)
+    result2 = set2 - set1  # или set2.difference(set1)
+    # Если нужен полный "симметричный разность" (все уникальные элементы из обоих массивов)
+    result_all = set1 ^ set2  # или set1.symmetric_difference(set2)
+    print("Все уникальные элементы:", result_all)
+    print('breakpoint')
 
 
 
