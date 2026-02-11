@@ -180,8 +180,6 @@ async def main(queue: asyncio.Queue, query:str):
                     ) as res:
                         responseText = await res.text()
                         response = json.loads(responseText)
-
-
                         if maxCount == 0:
                             maxCount = int(response['total'])
                             max_card_count = maxCount
@@ -193,8 +191,6 @@ async def main(queue: asyncio.Queue, query:str):
                             nms.append(str(res['id']))
                         nm = ';'.join(nms)
                         #print('DETAIL')
-
-
                     async with session.get(
                         url= f'https://www.wildberries.ru/__internal/u-card/cards/v4/detail?appType=1&curr=rub&dest={DEST}&spp=30&hide_vflags=4294967296&hide_dtype=9&ab_testing=false&lang=ru&nm={nm}',
                             ### костыль, нужно переписать нормально чтобы получать cookie для парса )
