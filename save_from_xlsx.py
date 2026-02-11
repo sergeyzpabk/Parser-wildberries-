@@ -19,7 +19,7 @@ def save(date:dict):
     Остатки по товару (число)
     Рейтинг
     Количество отзывов""".split('\n')
-    print(len(cal))
+    #print(len(cal))
 
     file_path = 'data_save.xlsx'
     file_path_filter = 'data_save_filter.xlsx'
@@ -53,20 +53,13 @@ def save(date:dict):
         sheetfilter = workbookfilter.active
         sheetids = workbookids.active
 
-
-
-
-
-
-
-
     all = []
     #Ещё один костыль. Зато работает) Здесь мы получаем все наши списки карточек которые спарсили )
     for i in date:
         for j in i['card']:
             for z in j:
                     all.append(z)
-    print(f'Пришло на сохранение {len(all)}')
+    #print(f'Пришло на сохранение {len(all)}')
     #print(all)
     for info in all:
 
@@ -74,7 +67,7 @@ def save(date:dict):
             ids_save.append(info.article)
             sheetids.append([info.article])
         else:
-            print(f'Дубль XLSX, {info.article}')
+            #print(f'Дубль XLSX, {info.article}')
             continue
         print(f"ids_save {len(ids_save)}")
         new_data = [

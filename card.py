@@ -50,12 +50,12 @@ async def getCard(
                 async with lock:
                     detail = await queue.get()
                 #print(f'get detaul len {len(detail)}')
-                await  asyncio.sleep(0.5)
+                #await  asyncio.sleep(0.5)
                 if detail == None:
                     break
                 ids =str(  detail['id'] )
 
-                print(f'Карточка {ids}')
+                #print(f'Карточка {ids}')
                 info = DataClass()
                 for i in range(0, 3):
                     try:
@@ -161,7 +161,7 @@ async def main(queue: asyncio.Queue, query:str):
             job=job,
         ))
         tasks_list.append(task_obj)
-    print('НАЧИНАМ СБОР ПО ПОИСКУ ')
+    #print('НАЧИНАМ СБОР ПО ПОИСКУ ')
 
     async with aiohttp.ClientSession() as session:
         startTime = time.time()
@@ -185,14 +185,14 @@ async def main(queue: asyncio.Queue, query:str):
                         if maxCount == 0:
                             maxCount = int(response['total'])
                             max_card_count = maxCount
-                            print(f'TOTAL PARS{maxCount}')
-                            print(f"Карточек по запросу «{query}»: {maxCount}")
+                            #print(f'TOTAL PARS{maxCount}')
+                            #print(f"Карточек по запросу «{query}»: {maxCount}")
                         nm = ''
                         nms = []
                         for res in response['products']:
                             nms.append(str(res['id']))
                         nm = ';'.join(nms)
-                        print('DETAIL')
+                        #print('DETAIL')
 
 
                     async with session.get(
@@ -204,22 +204,15 @@ async def main(queue: asyncio.Queue, query:str):
                         responseText = await res.text()
                         response = json.loads(responseText)
                         #print(response)
-                        print(f'Получили карточек {len(response['products'])}')
+                        #print(f'Получил {len(response['products'])} карточек товара')
                         for q in response['products']:
                             if not str(q['id']) in card_pars_id:
                                 card_pars_id.append(str(q['id']))
                                 await queue.put(q)
                             else:
                                 duble[str(q['id'])] = q
-                                print(f'Дубль {q['id']}')
-                        #print(response)
-                        print('--DETAIL---')
+                                #print(f'Дубль {q['id']}')
 
-                    ###!!!Внимание break
-
-                    #if count>300:
-                     #   break
-                    #break
                 except Exception as err:
                     print('ошибка выполнения запроса')
                     if count == 0:
@@ -234,27 +227,18 @@ async def main(queue: asyncio.Queue, query:str):
     job = False
     for i in range(0, len(listProxyCookie)+1):
         await queue.put(None)
-    print('job = False')
+    print(f'Ожидание сбора по {max_card_count} карточкам')
     results = await asyncio.gather(*tasks_list)
-
-    ###Save openXlsx
-    save(results)
-    ###---Save openXlsx
     print(f'Дубли при SEARCH {len(duble)}')
     print(f'Всего карточек {max_card_count}')
     print(f'Карточек отправленых в pars {len(card_pars_id)}')
     print(f'Время сбора карточек из поиска: {(time.time() - startTime):.4f} секунд')
 
-    set1 = set(ids_save)
-    set2 = set(card_pars_id)
+    ###Save openXlsx
+    save(results)
+    ###---Save openXlsx
 
-    result1 = set1 - set2  # или set1.difference(set2)
-    # Находим элементы, которые есть только во втором массиве (но нет в первом)
-    result2 = set2 - set1  # или set2.difference(set1)
-    # Если нужен полный "симметричный разность" (все уникальные элементы из обоих массивов)
-    result_all = set1 ^ set2  # или set1.symmetric_difference(set2)
-    print("Все уникальные элементы:", result_all)
-    print('breakpoint')
+    print('Завершил сбор данных')
 
 
 
